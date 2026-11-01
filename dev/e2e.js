@@ -21,6 +21,9 @@ const Lab = require('./core.js');
   const fill = async (sel, v) => { await page.fill(sel, String(v)); };
   const setScrew = async o => { for (const [id, v] of Object.entries(o)) await fill('#' + id, v); };
   const z = () => page.evaluate(() => window.__fs.ui.jack.z);
+  // The drawing is replaced on every redraw (for example when the sliding block reaches the
+  // bottom), so measuring it can land between the old and new element. Measure again if so.
+  const boxOf = async sel => { for (let i = 0; i < 20; i++) { const b = await page.locator(sel).first().boundingBox(); if (b) return b; await page.waitForTimeout(50); } throw new Error('no box for ' + sel); };
 
   console.log('FS-4: the default square thread through the interface');
   await t.fresh();
@@ -78,7 +81,7 @@ const Lab = require('./core.js');
   await t.fresh();
   await page.evaluate(() => Anim.manual(true));
   {
-    const b = await page.locator('#fsDown').boundingBox();
+    const b = await boxOf('#fsDown');
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     const z0 = await z();
     await page.mouse.down();
@@ -170,7 +173,7 @@ const Lab = require('./core.js');
   t.ok('the handle reports its value', (await page.getAttribute('#fsTheta', 'aria-valuenow')) === '60.00');
   await page.keyboard.press('Home');
   await page.waitForFunction(() => window.__app.state.theta === 0);
-  const svgBox = await page.locator('#fsSvg').boundingBox();
+  const svgBox = await boxOf('#fsSvg');
   // The handle sits at the top of the ramp: (36 + 252, 262) at 0°. Drag it to 45° from the pivot (36, 262).
   const k = svgBox.width / 680, tx = svgBox.x + (36 + 200 * Math.cos(Math.PI / 4)) * k, ty = svgBox.y + (262 - 200 * Math.sin(Math.PI / 4)) * k;
   await page.mouse.move(svgBox.x + 288 * k, svgBox.y + 262 * k); await page.mouse.down();
